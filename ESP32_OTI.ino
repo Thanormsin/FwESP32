@@ -14,9 +14,9 @@
 const char * ssid = "Tha1-2.4G";
 const char * password = "0819065291";
 
-String FirmwareVer = {"2.0"};
-#define URL_fw_Version "https://raw.githubusercontent.com/Thanormsin/FwESP32/master/bin_version.txt"
-#define URL_fw_Bin "https://raw.githubusercontent.com/Thanormsin/FwESP32/master/fw.bin"
+String FirmwareVer = {"1.5"};
+#define URL_fw_Version "https://raw.githubusercontent.com/Thanormsin/FwESP32/main/bin_version.txt"
+#define URL_fw_Bin "https://raw.githubusercontent.com/Thanormsin/FwESP32/main/fw.bin"
 
 void connect_wifi();
 void firmwareUpdate();
@@ -184,7 +184,7 @@ int FirmwareVersionCheck(void) {
   {
     payload.trim();
     if (payload.equals(FirmwareVer)) {
-      Serial.printf("Device already on latest firmware version:%s\n", FirmwareVer);
+      Serial.printf("Device already on latest firmware version : %s\n", FirmwareVer);
       Serial.println("");
       return 0;
     } 
