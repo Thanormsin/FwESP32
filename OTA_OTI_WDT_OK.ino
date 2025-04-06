@@ -12,9 +12,116 @@
 #include <HTTPUpdate.h>
 #include <WiFiClientSecure.h>
 
+//### OTA ##################
 #include <ESPmDNS.h>
 #include <NetworkUdp.h>
 #include <ArduinoOTA.h>
+//### OTA ##################
+
+//### OTA WebUpdate ##################
+#include <WiFi.h>
+//#include <WiFiClient.h>
+#include <WebServer.h>
+//#include <ESPmDNS.h>
+#include <Update.h>
+
+const char* host = "Compackset";
+//const char* ssid = "Tha2-2.4G";
+//const char* password = "0819065291";
+
+WebServer server(80);
+/*
+ * Login page
+ */
+//### OTA WebUpdate ##################
+
+const char* loginIndex =
+ "<form name='loginForm'>"
+    "<table width='20%' bgcolor='A09F9F' align='center'>"
+        "<tr>"
+            "<td colspan=2>"
+                "<center><font size=4><b>ESP32 Login Page</b></font></center>"
+                "<br>"
+            "</td>"
+            "<br>"
+            "<br>"
+        "</tr>"
+        "<tr>"
+             "<td>Username:</td>"
+             "<td><input type='text' size=25 name='userid'><br></td>"
+        "</tr>"
+        "<br>"
+        "<br>"
+        "<tr>"
+            "<td>Password:</td>"
+            "<td><input type='Password' size=25 name='pwd'><br></td>"
+            "<br>"
+            "<br>"
+        "</tr>"
+        "<tr>"
+            "<td><input type='submit' onclick='check(this.form)' value='Login'></td>"
+        "</tr>"
+    "</table>"
+"</form>"
+"<script>"
+    "function check(form)"
+    "{"
+    "if(form.userid.value=='admin' && form.pwd.value=='admin')"
+    "{"
+    "window.open('/serverIndex')"
+    "}"
+    "else"
+    "{"
+    " alert('Error Password or Username')/*displays error message*/"
+    "}"
+    "}"
+"</script>";
+
+/*
+ * Server Index Page
+ */
+
+const char* serverIndex =
+"<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
+"<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
+   "<input type='file' name='update'>"
+        "<input type='submit' value='Update'>"
+    "</form>"
+ "<div id='prg'>progress: 0%</div>"
+ "<script>"
+  "$('form').submit(function(e){"
+  "e.preventDefault();"
+  "var form = $('#upload_form')[0];"
+  "var data = new FormData(form);"
+  " $.ajax({"
+  "url: '/update',"
+  "type: 'POST',"
+  "data: data,"
+  "contentType: false,"
+  "processData:false,"
+  "xhr: function() {"
+  "var xhr = new window.XMLHttpRequest();"
+  "xhr.upload.addEventListener('progress', function(evt) {"
+  "if (evt.lengthComputable) {"
+  "var per = evt.loaded / evt.total;"
+  "$('#prg').html('progress: ' + Math.round(per*100) + '%');"
+  "}"
+  "}, false);"
+  "return xhr;"
+  "},"
+  "success:function(d, s) {"
+  "console.log('success!')"
+ "},"
+ "error: function (a, b, c) {"
+ "}"
+ "});"
+ "});"
+ "</script>";
+
+/*
+ * setup function
+ */
+//### OTA WebUpdate ##################
 
 //### LCD ##################
 #include <Wire.h>
@@ -22,6 +129,7 @@
 //LiquidCrystal_I2C lcd(0x27, 16, 2); // ถ้าไม่ได้ให้ลอง 0x27
 LiquidCrystal_I2C lcd(0x27, 20, 4); // ถ้าไม่ได้ให้ลอง 0x27
 
+//const char* host = "Compackset";
 const char * ssid = "Tha2-2.4G";
 const char * password = "0819065291";
 
@@ -56,7 +164,7 @@ void repeatedCall() {
     Serial.println(FirmwareVer);
    if(WiFi.status() == WL_CONNECTED) 
    {
-       Serial.println("wifi connected");
+     Serial.println("wifi connected");
    }
    else
    {
@@ -76,11 +184,6 @@ Button button_boot = {
   0,
   false
 };
-/*void IRAM_ATTR isr(void* arg) {
-    Button* s = static_cast<Button*>(arg);
-    s->numberKeyPresses += 1;
-    s->pressed = true;
-}*/
 
 void IRAM_ATTR isr() {
   button_boot.numberKeyPresses += 1;
@@ -102,18 +205,18 @@ void setup() {
   lcd.backlight(); //คำสั่งเปิดไฟแบล็คไลท์ 
   lcd.clear();
   
-  lcd.home (); // ไปที่ตัวอักษรที่ 0 แถวที่ 1
+  lcd.home (); 
   
-  lcd.setCursor(0,0); // ไปทตัวอักษรที่ 1 แถวที่ 1
+  lcd.setCursor(0,0); 
   lcd.print("CompackSet Ver. 3");
 
-  lcd.setCursor(0,1); // ไปทตัวอักษรที่ 1 แถวที่ 1
+  lcd.setCursor(0,1); 
   lcd.print("Update Over Internet");
 
-  lcd.setCursor(0,2); // ไปทตัวอักษรที่ 1 แถวที่ 1
+  lcd.setCursor(0,2); 
   lcd.print("Are you ready");
 
-  lcd.setCursor(0,3); // ไปทตัวอักษรที่ 1 แถวที่ 1
+  lcd.setCursor(0,3); 
   lcd.print("Let's Start it."); 
   //#### LCD 2004 ##########################
 
@@ -125,7 +228,7 @@ void setup() {
   // ArduinoOTA.setPort(3232);
 
   // Hostname defaults to esp3232-[MAC]
-  ArduinoOTA.setHostname("5Relay_16IO_3");
+  ArduinoOTA.setHostname("Compackset");
 
   // No authentication by default
   // ArduinoOTA.setPassword("admin");
@@ -169,53 +272,126 @@ void setup() {
 
   ArduinoOTA.begin();
 
+  //### OTA WebUpdate ##################
+  /*use mdns for host name resolution*/
+  if (!MDNS.begin(host)) { //http://esp32.local
+    Serial.println("Error setting up MDNS responder!");
+    while (1) {
+      delay(1000);
+    }
+  }
+  Serial.println("mDNS responder started");
+  /*return index page which is stored in serverIndex */
+  server.on("/", HTTP_GET, []() {
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/html", loginIndex);
+  });
+  server.on("/serverIndex", HTTP_GET, []() {
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/html", serverIndex);
+  });
+  /*handling uploading firmware file */
+  server.on("/update", HTTP_POST, []() {
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+    ESP.restart();
+  }, []() {
+    HTTPUpload& upload = server.upload();
+    if (upload.status == UPLOAD_FILE_START) {
+      Serial.printf("Update: %s\n", upload.filename.c_str());
+      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
+        Update.printError(Serial);
+      }
+    } else if (upload.status == UPLOAD_FILE_WRITE) {
+      /* flashing firmware to ESP*/
+      if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+        Update.printError(Serial);
+      }
+    } else if (upload.status == UPLOAD_FILE_END) {
+      if (Update.end(true)) { //true to set the size to the current progress
+        Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+      } else {
+        Update.printError(Serial);
+      }
+    }
+  });
+  server.begin();
+  //### OTA WebUpdate ##################
+
   //#### Connect Wifi ##########################
   //lcd.begin();
   //lcd.backlight(); //คำสั่งเปิดไฟแบล็คไลท์ 
   lcd.clear();
   
-  lcd.home (); // ไปที่ตัวอักษรที่ 0 แถวที่ 1
-
-  lcd.setCursor(0,0); // ไปทตัวอักษรที่ 1 แถวที่ 1
-  lcd.print("Wifi Status");
+  lcd.home (); 
   
-  lcd.setCursor(0,1); // ไปทตัวอักษรที่ 1 แถวที่ 1
-  lcd.print("SSID:");
+  lcd.setCursor(0,0); 
+  lcd.print("Exsample Code");
 
-  lcd.setCursor(5,1); // ไปทตัวอักษรที่ 1 แถวที่ 1
-  lcd.print(ssid);
+  lcd.setCursor(0,1); 
+  lcd.print("OTA,OTI,Web Update");
 
-  lcd.setCursor(0,2); // ไปทตัวอักษรที่ 1 แถวที่ 1
-  lcd.print("IP address: ");
-
-  lcd.setCursor(0,3); // ไปทตัวอักษรที่ 1 แถวที่ 1
-  lcd.print(WiFi.localIP());
+  lcd.setCursor(0,3); 
+  lcd.print("By:Thanormsin.M");
   //#### Connect Wifi ##########################
 
   delay(2500);
 }
 void loop() {
+  //### OTA ##################
   ArduinoOTA.handle();  
+
+  //### OTA WebUpdate ##################
+  server.handleClient();
+  //delay(1);
   
   //#### LCD 2004 ##########################
   //lcd.begin();
   lcd.backlight(); //คำสั่งเปิดไฟแบล็คไลท์ 
   lcd.clear();
   
-  lcd.home (); // ไปที่ตัวอักษรที่ 0 แถวที่ 1
+  lcd.home (); 
 
-  lcd.setCursor(0,0); // ไปทตัวอักษรที่ 1 แถวที่ 1
-  lcd.print("Update Over Internet");
-
-  lcd.setCursor(0,2); // ไปทตัวอักษรที่ 1 แถวที่ 1
-  lcd.print("Board is run on");
+  lcd.setCursor(0,0); 
+  lcd.print("Board:");
+  lcd.print(host);
   
-  lcd.setCursor(0,3); // ไปทตัวอักษรที่ 1 แถวที่ 1
+  lcd.setCursor(0,1); 
+  lcd.print("SSID:");
+  //lcd.setCursor(5,1); 
+  lcd.print(ssid);
+
+  lcd.setCursor(0,2); 
+  lcd.print("IP:");
+  lcd.print(WiFi.localIP());
+
+  lcd.setCursor(0,3); 
   lcd.print("Current Fw. V. ");
   lcd.print(FirmwareVer);
   
   if (button_boot.pressed) { //to connect wifi via Android esp touch app 
     Serial.println("Starting Manual Firmware update..");
+
+    //#### LCD 2004 ##########################
+    //lcd.begin();
+    lcd.backlight(); //คำสั่งเปิดไฟแบล็คไลท์ 
+    lcd.clear();
+    
+    lcd.home (); 
+
+    lcd.setCursor(0,0); 
+    lcd.print("    -->>  <<--");
+  
+    lcd.setCursor(0,1); 
+    lcd.print("Manual update...");
+    
+    lcd.setCursor(0,2); 
+    lcd.print("Pls. wait amoment");            
+
+    lcd.setCursor(0,3); 
+    lcd.print("Update progress ....");
+    //#### LCD 2004 ##########################
+    
     firmwareUpdate();
     button_boot.pressed = false;
   }
@@ -267,15 +443,15 @@ void firmwareUpdate(void) {
     lcd.backlight(); //คำสั่งเปิดไฟแบล็คไลท์ 
     lcd.clear();
     
-    lcd.home (); // ไปที่ตัวอักษรที่ 0 แถวที่ 1
+    lcd.home (); 
 
-    lcd.setCursor(0,0); // ไปทตัวอักษรที่ 1 แถวที่ 1
+    lcd.setCursor(0,0); 
     lcd.print("    -->>  <<--");
   
-    lcd.setCursor(0,1); // ไปทตัวอักษรที่ 1 แถวที่ 1
+    lcd.setCursor(0,1); 
     lcd.print("Found new firmware");
 
-    lcd.setCursor(0,2); // ไปทตัวอักษรที่ 1 แถวที่ 1
+    lcd.setCursor(0,2); 
     lcd.print("But Update Failer...");
     delay(2000);
     
@@ -347,19 +523,19 @@ int FirmwareVersionCheck(void) {
       lcd.backlight(); //คำสั่งเปิดไฟแบล็คไลท์ 
       lcd.clear();
       
-      lcd.home (); // ไปที่ตัวอักษรที่ 0 แถวที่ 1
+      lcd.home (); 
 
-      lcd.setCursor(0,0); // ไปทตัวอักษรที่ 1 แถวที่ 1
+      lcd.setCursor(0,0); 
       lcd.print("    -->>  <<--");
     
-      lcd.setCursor(0,1); // ไปทตัวอักษรที่ 1 แถวที่ 1
+      lcd.setCursor(0,1); 
       lcd.print("Check new firmware");
       
-      lcd.setCursor(0,2); // ไปทตัวอักษรที่ 1 แถวที่ 1
+      lcd.setCursor(0,2); 
       lcd.print("Found Fw. ver : ");            
       lcd.print(payload);
 
-      lcd.setCursor(0,3); // ไปทตัวอักษรที่ 1 แถวที่ 1
+      lcd.setCursor(0,3); 
       lcd.print("Update firmware ....");
       //#### LCD 2004 ##########################
       
